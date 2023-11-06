@@ -21,7 +21,7 @@
             </ul>
           {% endif %}
         {% endwith %}
-    </p>
+    U7</p>
 
     <form method="post" action="/" enctype="multipart/form-data">
         <dl>
@@ -30,7 +30,9 @@
             </p>
         </dl>
         <p>
-            <input type="submit" value="Submit" class="btn btn-info">
+            <div align="center">
+                <input type="submit" value="Submit" class="btn btn-info">
+            </div>
         </p>
     </form>
 </div>
@@ -38,8 +40,9 @@
  {% if filename %}
         <div>
             <h2 align="center" style="color:Azure"> Image uploaded successfully </h2>
+            <div align="center">
             <a href="predict" class="btn btn-primary" role="button">Image Analysis</a>
-
+            </div>
         </div>
     {% endif %}
 </body>

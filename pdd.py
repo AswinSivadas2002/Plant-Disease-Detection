@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 app = Flask(__name__)
 
 UPLOAD_FOLDER = 'static/uploads/'
-model = tf.keras.models.load_model('PlantDNet.h5', compile=False)
+model = tf.keras.models.load_model('model.h5', compile=False)
 print('model loaded successfully')
 
 app.secret_key = "secret key"
@@ -51,6 +51,15 @@ def upload_image():
     if file.filename == '':
         flash('No image selected for uploading')
         return redirect(request.url)
+    if(len(os.listdir("static/uploads"))>1):
+        print("non-empty")
+        directory_path="static/uploads"
+        files = os.listdir(directory_path)
+        for f in files:
+            file_path = os.path.join(directory_path, f)
+            if f!=file.filename:
+                os.remove(file_path)
+
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
