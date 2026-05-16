@@ -1,46 +1,51 @@
-from flask import Flask, flash, request, redirect, url_for, render_template
-import urllib.request
+from flask import Flask, flash, request, redirect, render_template
 import os
 import tensorflow as tf
-from tensorflow import keras
 import keras.utils as image
+from keras.applications.densenet import preprocess_input
 from werkzeug.utils import secure_filename
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 
 app = Flask(__name__)
+app.secret_key = "secret key"
 
 UPLOAD_FOLDER = 'static/uploads/'
-model = tf.keras.models.load_model('model.h5', compile=False)
-print('model loaded successfully')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
-app.secret_key = "secret key"
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
-file_name=''
-ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg', 'gif'])
+
+model = tf.keras.models.load_model('model.h5', compile=False)
+print('Model loaded successfully')
+
+DISEASE_CLASSES = [
+    'Pepper__bell___Bacterial_spot', 'Pepper__bell___healthy',
+    'Potato___Early_blight', 'Potato___Late_blight', 'Potato___healthy',
+    'Tomato_Bacterial_spot', 'Tomato_Early_blight', 'Tomato_Late_blight',
+    'Tomato_Leaf_Mold', 'Tomato_Septoria_leaf_spot',
+    'Tomato_Spider_mites_Two_spotted_spider_mite', 'Tomato__Target_Spot',
+    'Tomato__Tomato_YellowLeaf__Curl_Virus', 'Tomato__Tomato_mosaic_virus',
+    'Tomato_healthy'
+]
 
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def model_predict(model):
-    filename = os.listdir(UPLOAD_FOLDER)[0]
-    img_path=UPLOAD_FOLDER+filename
-    print(img_path)
-    img = image.load_img(img_path, grayscale=False, target_size=(64, 64))
-    show_img = image.load_img(img_path, grayscale=False, target_size=(64, 64))
+
+def model_predict(filename):
+    img_path = os.path.join(UPLOAD_FOLDER, filename)
+    img = image.load_img(img_path, target_size=(224, 224))
     x = image.img_to_array(img)
     x = np.expand_dims(x, axis=0)
-    x = np.array(x, 'float32')
-    x /= 255
-    preds = model.predict(x)
-    return preds
+    x = preprocess_input(x)
+    return model.predict(x)
+
 
 @app.route('/')
 def home():
     return render_template('index.html')
+
 
 @app.route('/', methods=['POST'])
 def upload_image():
@@ -51,44 +56,35 @@ def upload_image():
     if file.filename == '':
         flash('No image selected for uploading')
         return redirect(request.url)
-    if(len(os.listdir("static/uploads"))>1):
-        print("non-empty")
-        directory_path="static/uploads"
-        files = os.listdir(directory_path)
-        for f in files:
-            file_path = os.path.join(directory_path, f)
-            if f!=file.filename:
-                os.remove(file_path)
-
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-
-        flash('Image successfully uploaded and displayed below')
-        #file_name=filename
-        return render_template('index.html', filename=filename)
-    else:
-        flash('Allowed image types are - png, jpg, jpeg, gif')
+    if not (file and allowed_file(file.filename)):
+        flash('Allowed image types are: png, jpg, jpeg, gif')
         return redirect(request.url)
 
-@app.route('/predict', methods=['GET', 'POST'])
-def upload():
-    preds = model_predict(model)
-    print(preds[0])
+    # Always clear previous upload so the folder has exactly one file
+    for f in os.listdir(UPLOAD_FOLDER):
+        os.remove(os.path.join(UPLOAD_FOLDER, f))
 
-    # x = x.reshape([64, 64]);
-    disease_class = ['Pepper__bell___Bacterial_spot', 'Pepper__bell___healthy', 'Potato___Early_blight',
-                     'Potato___Late_blight', 'Potato___healthy', 'Tomato_Bacterial_spot', 'Tomato_Early_blight',
-                     'Tomato_Late_blight', 'Tomato_Leaf_Mold', 'Tomato_Septoria_leaf_spot',
-                     'Tomato_Spider_mites_Two_spotted_spider_mite', 'Tomato__Target_Spot',
-                     'Tomato__Tomato_YellowLeaf__Curl_Virus', 'Tomato__Tomato_mosaic_virus', 'Tomato_healthy']
-    a = preds[0]
-    ind = np.argmax(a)
-    print('Prediction:', disease_class[ind])
-    result = disease_class[ind]
-    print(result)
-    img=UPLOAD_FOLDER+os.listdir(UPLOAD_FOLDER)[0]
-    return render_template('predict.html',result=result,img=img)
+    filename = secure_filename(file.filename)
+    file.save(os.path.join(UPLOAD_FOLDER, filename))
+    flash('Image successfully uploaded')
+    return render_template('index.html', filename=filename)
+
+
+@app.route('/predict', methods=['GET'])
+def predict():
+    files = os.listdir(UPLOAD_FOLDER)
+    if not files:
+        flash('Please upload an image first')
+        return redirect('/')
+
+    filename = files[0]
+    preds = model_predict(filename)
+    ind = np.argmax(preds[0])
+    result = DISEASE_CLASSES[ind]
+    confidence = round(float(preds[0][ind]) * 100, 1)
+    img = UPLOAD_FOLDER + filename
+    return render_template('predict.html', result=result, confidence=confidence, img=img)
+
 
 if __name__ == "__main__":
     app.run(debug=True)

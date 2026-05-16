@@ -1,2 +1,7 @@
 /Lib/
 /Scripts/
+__pycache__/
+*.pyc
+pyvenv.cfg
+static/uploads/*
+!static/uploads/.gitkeep
